@@ -4,7 +4,7 @@
 #include <chrono>
 
 // hard dependency
-#include <fmt/format.h>
+#include <ps4delta/code/vendor/fmtlib/fmt/format.h>
 
 // log impl is heavily influenced & based on the yuzu logger
 
