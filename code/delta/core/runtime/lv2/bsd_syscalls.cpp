@@ -12,6 +12,43 @@ namespace runtime
 		return 0;
 	}
 
+	int PS4ABI sys_exit()
+	{
+		__debugbreak();
+		return 0;
+	}
+
+	int PS4ABI sys_rfork()
+	{
+		__debugbreak();
+		return 0;
+	}
+
+	int PS4ABI sys_execve()
+	{
+		__debugbreak();
+		return 0;
+	}
+
+	int PS4ABI sys_sigprocmask(int how, const int* sigset, int* oset)
+	{
+		return 0;
+	}
+
+	/*does not belong here*/
+	int PS4ABI sys_namedobj_create(int idk)
+	{
+		static int fakecounter = 0;
+		int value = fakecounter;
+		fakecounter++;
+		return value;
+	}
+
+	int PS4ABI sys_namedobj_delete()
+	{
+		return 0;
+	}
+
 	struct nonsys_int
 	{
 		union
@@ -33,7 +70,6 @@ namespace runtime
 	/*TODO: clearly does not belong here*/
 	int PS4ABI sys_regmgr_call(uint32_t op, uint32_t id, void* result, void* value, uint64_t type)
 	{
-		__debugbreak();
 		if (op == 25) // non-system get int
 		{
 			auto int_value = static_cast<nonsys_int*>(value);
@@ -47,6 +83,8 @@ namespace runtime
 
 			return 0x800D0203;
 		}
+		else
+			__debugbreak();
 
 		return -1;
 	}
@@ -56,6 +94,13 @@ namespace runtime
 		// for sceKernelGetAppInfo
 		if (name[0] == 1 && namelen == 4 && *oldlenp == 72) {
 			return 0;
+		}
+
+		if (name[0] == 0 && name[1] == 3 && namelen == 2) {
+			auto name = std::string_view(static_cast<const char*>(newp), newlen);
+			if (name == "kern.neomode") {
+
+			}
 		}
 
 		/*for sceKernelGetLibkernelTextLocation*/
@@ -70,7 +115,7 @@ namespace runtime
 		return 0x1337;
 	}
 
-	bool PS4ABI sys_write(uint32_t fd, const void* buf, size_t nbytes)
+	int PS4ABI sys_write(uint32_t fd, const void* buf, size_t nbytes)
 	{
 		if (fd == 1 || fd == 2) // stdout, stderr
 		{
@@ -79,9 +124,9 @@ namespace runtime
 			{
 				printf("%c", *b);
 			}
-			return true;
+			return 0;
 		}
 
-		return false;
+		return -1;
 	}
 }

@@ -100,12 +100,8 @@ namespace krnl
 
 		if (elf->entry == 0) 
 			entry = nullptr;
-		else {
+		else
 			entry = getAddress<uint8_t>(elf->entry);
-
-			if (!isSprx())
-				std::printf("MAIN PROC %p\n", entry);
-		}
 
 		//callConstructors();
 		return true;
@@ -244,12 +240,12 @@ namespace krnl
 			codeSize += pcfg.ripZoneSize;
 
 		// reserve segment
-		base = (uint8_t*)process->vmem.AllocateSeg(codeSize);
+		base = process->vmem.mapCodeMemory(nullptr, codeSize);
 		if (!base)
 			return false;
 
 #ifdef _DEBUG
-		std::printf("base %p for %s\n", base, name.c_str());
+		std::printf("Mapped %s @ %p\n", name.c_str(), base);
 #endif
 
 		// pad out space with int3d's
@@ -400,19 +396,18 @@ namespace krnl
 				continue;
 
 			// if the symbol is exported
-			int32_t binding = ELF64_ST_BIND(s->st_info);
-			if (binding == STB_GLOBAL) {
-				const char* name = &strtab.ptr[s->st_name];
+			//int32_t binding = ELF64_ST_BIND(s->st_info);
 
-				uint64_t hid = 0;
-				if (!runtime::decode_nid(name, 11, hid)) {
-					LOG_ERROR("resolveExport: cant handle NID");
-					return 0;
-				}
+			const char* name = &strtab.ptr[s->st_name];
 
-				if (nid == hid) {
-					return getAddressNPTR<uintptr_t>(s->st_value);
-				}
+			uint64_t hid = 0;
+			if (!runtime::decode_nid(name, 11, hid)) {
+				LOG_ERROR("resolveExport: cant handle NID");
+				return 0;
+			}
+
+			if (nid == hid) {
+				return getAddressNPTR<uintptr_t>(s->st_value);
 			}
 		}
 
