@@ -10,3 +10,9 @@
 [submodule "code/vendor/xbyak"]
 	path = code/vendor/xbyak
 	url = https://github.com/herumi/xbyak
+[submodule "code/vendor/glfw"]
+	path = code/vendor/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "code/vendor/yaml-cpp"]
+	path = code/vendor/yaml-cpp
+	url = https://github.com/DevForce-dev/yaml-cpp
