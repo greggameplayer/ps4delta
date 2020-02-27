@@ -14,6 +14,8 @@
 #include <utl/fxm.h>
 #include <config.h>
 
+#include "loader/elf.h"
+
 #include <xbyak.h>
 
 #include "core.h"
@@ -39,7 +41,10 @@ UniquePtr<process> process::create(core::System& sys, std::string name) {
     // set that process active
     current_proc = proc.get();
 
-    LOG_INFO("process::create {} with pid {}", proc->name, proc->pid);
+    // and create the user stack
+    proc->userStack = memory::alloc(user_stack_size, memory::app);
+
+    LOG_INFO("process::create {} with pid {}, userstack @ {}", proc->name, proc->pid, fmt::ptr(proc->userStack));
     return proc;
 }
 
@@ -66,7 +71,7 @@ SharedPtr<prx_module> process::loadPrx(std::string_view name) {
 }
 
 SharedPtr<prx_module> process::getPrx(std::string_view name) {
-    auto iter = std::find_if(modules.begin(), modules.end(),
+   auto iter = std::find_if(modules.begin(), modules.end(),
                              [&name](const auto& e) { return e->name == name; });
 
    if (iter != modules.end())
@@ -111,7 +116,7 @@ void process::run() {
     using exit_func_t = PS4ABI void (*)();
     using main_init_t = PS4ABI void (*)(void*, exit_func_t);
 
-    init_modules(*this, false);
+    initModules(*this, false);
 
     union stack_entry {
         const void* ptr;
