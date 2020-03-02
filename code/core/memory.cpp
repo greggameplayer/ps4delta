@@ -8,6 +8,8 @@
  */
 
 #include <base.h>
+#include <logger/logger.h>
+
 #include "memory.h"
 
 namespace memory {
@@ -49,10 +51,10 @@ block::~block() {
         decommit(a.first);
 }
 
-u8* block::xalloc(u8* targetAddress, size_t size, u32 flags, page_flags prot, u32 align) {
+u8* block::xalloc(u8* targetAddress, size_t size, u32 flags, u8 pflags, u32 align) {
 
     const uintptr_t addr = reinterpret_cast<uintptr_t>(targetAddress);
-    if (!size || prot & page_allocated || (size | addr) % PS4_PAGE_SIZE)
+    if (!size || pflags & page_allocated || (size | addr) % PS4_PAGE_SIZE)
         return nullptr;
 
     if (flags & stack || flags & noextend)
@@ -76,16 +78,10 @@ u8* block::xalloc(u8* targetAddress, size_t size, u32 flags, page_flags prot, u3
          i < disp / AMD64_PAGE_SIZE + block_size / AMD64_PAGE_SIZE; i++) {
         auto& pinfo = pages[i];
 
-        if (!pinfo) {
-            // attempting to map at unowned memory?
-            //__debugbreak();
-            return nullptr;
-        }
-
         size_t hits = 0;
         // check if we get enough slots
         for (size_t k = i; k < (i + page_count); k++) {
-            if (!pages[k])
+            if (!pages[k] || pages[k] & page_flags::page_allocated)
                 hits++;
         }
 
@@ -97,7 +93,7 @@ u8* block::xalloc(u8* targetAddress, size_t size, u32 flags, page_flags prot, u3
 
         // mark pages as used
         for (size_t k = i; k < (i + page_count); k++)
-            pages[k].store(prot);
+            pages[k].exchange(pflags | page_flags::page_allocated);
 
         commit(targetAddress, block_size);
         break;
@@ -108,9 +104,9 @@ u8* block::xalloc(u8* targetAddress, size_t size, u32 flags, page_flags prot, u3
         std::memset(targetAddress, 0, block_size);
 
     page_protection tp = utl::page_read;
-    if (prot & page_writable)
+    if (pflags & page_writable)
         tp = utl::page_read_write;
-    if (prot & page_executable)
+    if (pflags & page_executable)
         tp |= utl::page_execute;
 
     // apply native page protection
@@ -121,8 +117,8 @@ u8* block::xalloc(u8* targetAddress, size_t size, u32 flags, page_flags prot, u3
     return targetAddress;
 }
 
-u8* block::alloc(size_t size, u32 flags, page_flags prot, u32 align) {
-    if (!size || prot & page_allocated)
+u8* block::alloc(size_t size, u32 flags, u8 pflags, u32 align) {
+    if (!size || pflags & page_allocated)
         return nullptr;
 
     if (flags & stack || flags & noextend)
@@ -166,7 +162,7 @@ u8* block::alloc(size_t size, u32 flags, page_flags prot, u32 align) {
 
         // mark pages as used
         for (size_t k = i; k < (i + page_count); k++)
-            pages[k].store(prot);
+            pages[k].exchange(pflags | page_flags::page_allocated);
 
         // and reserve the real memory
         allocation = (u8*)(this->base + (i * AMD64_PAGE_SIZE));
@@ -182,9 +178,9 @@ u8* block::alloc(size_t size, u32 flags, page_flags prot, u32 align) {
         std::memset(allocation, 0, block_size);
 
     page_protection tp = utl::page_read;
-    if (prot & page_writable)
+    if (pflags & page_writable)
         tp = utl::page_read_write;
-    if (prot & page_executable)
+    if (pflags & page_executable)
         tp |= utl::page_execute;
 
     // apply native page protection
@@ -227,6 +223,12 @@ bool vmManager::init() {
     blocks.push_back(std::make_shared<block>(g_areas->procMirror));
     blocks.push_back(std::make_shared<block>(g_areas->exec));
     blocks.push_back(std::make_shared<block>(g_areas->debug));
+
+    LOG_INFO("ProcArea {} ({})\nApp {} ({})\nExecArea {} ({})\nDebugArea {} ({})",
+             fmt::ptr(g_areas->proc.ptr), g_areas->proc.size, 
+             fmt::ptr(g_areas->procMirror.ptr), g_areas->procMirror.size, 
+             fmt::ptr(g_areas->exec.ptr), g_areas->exec.size, 
+             fmt::ptr(g_areas->debug.ptr),g_areas->debug.size);
 
     /*auto* memBase = reserve(0x2'0000'0000);
     if (!memBase)

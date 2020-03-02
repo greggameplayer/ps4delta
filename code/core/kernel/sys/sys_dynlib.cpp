@@ -86,40 +86,34 @@ int PS4ABI sys_dynlib_get_info_ex(uint32_t handle, int32_t ukn /*always 1*/,
 }
 
 int PS4ABI sys_dynlib_dlsym(uint32_t handle, const char* symName, void** sym) {
-    auto mod = activeProc()->getPrx(handle);
-    if (!mod)
-        return -1;
+    auto prx = activeProc()->getPrx(handle);
+    if (!prx) return -1;
 
-    std::printf("DLSYM %s!%s\n", mod->name.c_str(), symName);
+    LOG_INFO("{},{}", prx->name, symName);
 
     char nameenc[12]{};
     encode_nid(symName, reinterpret_cast<uint8_t*>(&nameenc));
 
-    auto& modName = mod->name;
-    std::string longName = std::string(nameenc) + "#" + modName + "#" + modName;
+    auto longName = std::string(nameenc) + "#" + prx->name + "#" + prx->name;
 
-    uintptr_t addrOut = 0;
-    if (!mod->resolveObfSymbol(longName.c_str(), addrOut)) {
-        *sym = nullptr;
-        return -1;
+    if (auto addrOut = prx->getSymbol(longName.c_str())) {
+        *sym = reinterpret_cast<void*>(addrOut);
+
+        return 0;
     }
-
-    *sym = reinterpret_cast<void*>(addrOut);
-
-    return 0;
+    LOG_WARNING("unable to find export {} ({})", symName, handle);
+    *sym = nullptr;
+    return -1;
 }
 
 int PS4ABI sys_dynlib_get_obj_member(uint32_t handle, uint8_t index, void** value) {
-    if (index != 1)
-        return SysError::eINVAL;
+    if (index != 1) return SysError::eINVAL;
 
     auto mod = activeProc()->getPrx(handle);
-    if (!mod)
-        return -1;
+    if (!mod) return -1;
 
-    __debugbreak();
-    // TBD
-    //*value = mod->getInfo().initAddr;
+
+    *value = static_cast<void*>(mod->initAddr);
     return 0;
 }
 
@@ -141,8 +135,11 @@ int PS4ABI sys_dynlib_get_list(uint32_t* handles, size_t maxCount, size_t* count
 
     int listCount = 0;
     for (auto& mod : list) {
+        std::printf("MODULE %s -> gets handle %d\n", mod->name.c_str(), mod->handle());
+
+        if (listCount++ > maxCount) break;
+
         *(handles++) = mod->handle();
-        listCount++;
     }
 
     *count = listCount;

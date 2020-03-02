@@ -58,7 +58,7 @@ int PS4ABI sys_sysctl(int* name, uint32_t namelen, void* oldp, size_t* oldlenp, 
 
     // kern.userstack
     else if (name[0] == 1 && name[1] == 33 && namelen == 2) {
-        u8* stack = activeProc()->getStack();
+        u8* stack = activeProc()->userStack;
         if (!stack) return -1;
 
         // the stack grows from top to bottom
@@ -68,7 +68,7 @@ int PS4ABI sys_sysctl(int* name, uint32_t namelen, void* oldp, size_t* oldlenp, 
 
     // kern.pagesize
     else if (name[0] == 6 && name[1] == 7 && namelen == 2) {
-        *reinterpret_cast<uint32_t*>(oldp) = 4096;
+        *reinterpret_cast<uint32_t*>(oldp) = 1024 * 16;
         return 0;
     }
 
